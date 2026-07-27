@@ -97,6 +97,10 @@ def run_pipeline(trigger: str) -> None:
                     store.set_status(o.id, "ERROR", str(e))
                     _last_run["errors"] += 1
             publisher.finalize(trigger)
+        except Exception:
+            # сбой этапа прохода — фиксируем и не роняем сервис (US-011)
+            log.exception("Проход аварийно завершён")
+            _last_run["errors"] += 1
         finally:
             store.close()
 

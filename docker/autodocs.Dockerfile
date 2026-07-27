@@ -20,6 +20,10 @@ RUN curl -sSL "$INSTANTCLIENT_URL" -o /tmp/ic.zip \
     && ln -s /opt/oracle/instantclient_* /opt/oracle/instantclient
 ENV LD_LIBRARY_PATH=/opt/oracle/instantclient
 
+# /wiki монтируется с хоста с чужим uid — иначе git внутри контейнера
+# отказывается работать (dubious ownership)
+RUN git config --system --add safe.directory '*'
+
 # ── Python-зависимости (uv) ──
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 WORKDIR /app
@@ -27,6 +31,7 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 
 # ── Приложение и дефолтные промпты ──
+COPY LICENSE ./
 COPY src/ ./src/
 # default_prompts копируются в PROMPTS_PATH при первом старте (US-017)
 COPY prompts/ ./default_prompts/
