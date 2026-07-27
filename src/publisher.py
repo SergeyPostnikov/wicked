@@ -80,6 +80,22 @@ class MkdocsPublisher:
     def remove(self, obj_path: Path) -> None:
         obj_path.unlink(missing_ok=True)
 
+    def _write_index(self) -> None:
+        """docs/index.md — оглавление по дереву страниц. Перестраивается целиком."""
+        pages = sorted(p for p in self._docs.rglob("*.md")
+                       if p.name != "index.md")
+        lines = ["# Документация", "",
+                 f"Всего страниц: {len(pages)}", ""]
+        current_dir = None
+        for p in pages:
+            rel = p.relative_to(self._docs)
+            if rel.parent != current_dir:
+                current_dir = rel.parent
+                lines += [f"## {current_dir.as_posix()}", ""]
+            lines.append(f"- [{p.stem}]({rel.as_posix()})")
+        (self._docs / "index.md").write_text("\n".join(lines) + "\n",
+                                             encoding="utf-8")
+
     def finalize(self, trigger: str) -> None:
         """mkdocs.yml при первом прогоне + git-коммит изменений вики."""
         if not self._written:
@@ -88,6 +104,7 @@ class MkdocsPublisher:
         mkdocs_yml = self._wiki / "mkdocs.yml"
         if not mkdocs_yml.exists():
             mkdocs_yml.write_text(_MKDOCS_YML, encoding="utf-8")
+        self._write_index()
 
         try:
             repo = Repo(self._wiki)

@@ -121,6 +121,8 @@ def test_publisher_writes_page_and_commits(tmp_path):
 
     pub.finalize("test")
     assert (tmp_path / "mkdocs.yml").exists()
+    index = (tmp_path / "docs" / "index.md").read_text()
+    assert "[billing.pkb](file/pkg/billing.pkb.md)" in index
     from git import Repo
     repo = Repo(tmp_path)
     assert not repo.is_dirty(untracked_files=True)
