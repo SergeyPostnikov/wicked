@@ -23,11 +23,14 @@ from apscheduler.triggers.cron import CronTrigger
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
 
 from src.config import settings
+from src.scanner import scan_all
+from src.state import StateStore
 
 log = logging.getLogger("autodocs")
 
 _run_lock = threading.Lock()
 _last_run: dict = {"started_at": None, "finished_at": None, "trigger": None,
+                   "scanned": 0, "changed": 0, "removed": 0,
                    "processed": 0, "skipped": 0, "errors": 0}
 
 
@@ -54,16 +57,30 @@ def run_pipeline(trigger: str) -> None:
     try:
         _last_run.update(started_at=datetime.now(UTC).isoformat(),
                          finished_at=None, trigger=trigger,
+                         scanned=0, changed=0, removed=0,
                          processed=0, skipped=0, errors=0)
         log.info("Проход начат (триггер: %s)", trigger)
 
-        # TODO: scanner — реестр объектов с чексуммами (волюм CODE_PATH, Oracle ALL_SOURCE)
-        # TODO: parser — сигнатуры и зависимости
-        # TODO: generator — LLM по промптам из PROMPTS_PATH, map-reduce для больших пакетов
-        # TODO: publisher — docs/*.md + mkdocs.yml в WIKI_PATH
+        store = StateStore(settings.state_path / "autodocs.db")
+        try:
+            objects, source_errors = scan_all(settings)
+            diff = store.apply_scan(objects)
+            _last_run.update(scanned=len(objects), changed=len(diff.changed),
+                             removed=len(diff.removed), skipped=len(diff.unchanged),
+                             errors=source_errors)
+            for o in diff.unchanged:
+                store.set_status(o.id, "SKIPPED")
+
+            # TODO: parser — сигнатуры и зависимости
+            # TODO: generator — LLM по промптам из PROMPTS_PATH, map-reduce для больших пакетов
+            # TODO: publisher — docs/*.md + mkdocs.yml в WIKI_PATH
+        finally:
+            store.close()
 
         _last_run["finished_at"] = datetime.now(UTC).isoformat()
-        log.info("Проход завершён: processed=%s skipped=%s errors=%s",
+        log.info("Проход завершён: scanned=%s changed=%s removed=%s "
+                 "processed=%s skipped=%s errors=%s",
+                 _last_run["scanned"], _last_run["changed"], _last_run["removed"],
                  _last_run["processed"], _last_run["skipped"], _last_run["errors"])
     finally:
         _run_lock.release()
