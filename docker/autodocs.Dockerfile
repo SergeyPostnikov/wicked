@@ -43,6 +43,16 @@ ENV CODE_PATH=/code \
     PROMPTS_PATH=/prompts \
     STATE_PATH=/state
 
+# Непривилегированный пользователь: волюмы (/wiki, /prompts, /state) остаются
+# доступны хосту, а не root-овые. uid/gid переопределяются под владельца
+# волюмов на хосте (compose: user: "${UID}:${GID}").
+ARG APP_UID=1000
+ARG APP_GID=1000
+RUN groupadd -g "$APP_GID" autodocs 2>/dev/null || true \
+    && useradd -m -u "$APP_UID" -g "$APP_GID" autodocs
+USER autodocs
+ENV HOME=/home/autodocs
+
 VOLUME ["/state"]
 EXPOSE 8080
 
