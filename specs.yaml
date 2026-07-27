@@ -26,6 +26,32 @@ glossary:
 
 # ─── Архитектура ─────────────────────────────────────────────────────────────
 
+deployment:
+  services_logical: 1  # весь пайплайн — модули одного процесса; очередей нет, состояние в SQLite
+  containers:
+    - name: autodocs
+      required: true
+      description: Сам сервис — scanner/parser/generator/publisher + cron и webhook в одном процессе
+    - name: ollama
+      required: false
+      description: >
+        Инференс. Не нужен, если Ollama уже захощена — autodocs ходит по OLLAMA_URL.
+        Отдельный контейнер из-за другого жизненного цикла (волюмы моделей, GPU/RAM-хост).
+    - name: viewer
+      required: false
+      description: >
+        Просмотр вики — mkdocs serve или nginx со статикой. Альтернатива:
+        autodocs сам делает mkdocs build в волюм, статику отдаёт любой существующий веб-сервер.
+  modes:
+    - name: docker compose (рекомендуемый)
+      description: Референсный стек из коробки — одна команда, волюмы и сеть декларативно
+    - name: одиночный docker run
+      description: Минимум — только контейнер autodocs, при уже захощенной Ollama
+    - name: без Docker
+      description: >
+        python-процесс + systemd. Возможно, но не рекомендуется — Docker решает
+        боль со старым Oracle instant client (запекается в образ).
+
 components:
   scanner:
     description: Обходит источники, строит реестр объектов с чексуммами
