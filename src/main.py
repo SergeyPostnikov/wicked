@@ -25,7 +25,7 @@ from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
 from src.config import settings
 from src.generator import Generator
 from src.llm import LLMError, OllamaClient
-from src.parser import Deps, parse_plsql_deps
+from src.parsers import Deps, get_parser
 from src.publisher import MkdocsPublisher
 from src.scanner import scan_all
 from src.state import StateStore
@@ -89,10 +89,8 @@ def run_pipeline(trigger: str) -> None:
                     continue
                 store.set_status(o.id, "RUNNING")
                 try:
-                    deps = (parse_plsql_deps(o.content, o.name)
-                            if "PACKAGE" in o.type or o.type in ("SQL", "PROCEDURE",
-                                                                 "FUNCTION", "TRIGGER")
-                            else Deps())
+                    parser = get_parser(o.type)
+                    deps = parser.parse(o.content, o.name) if parser else Deps()
                     llm_text = generator.describe(o)
                     publisher.publish(o, llm_text, deps)
                     store.set_status(o.id, "SUCCESS")

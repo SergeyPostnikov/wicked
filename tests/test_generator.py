@@ -1,9 +1,13 @@
 from pathlib import Path
 
 from src.generator import Generator, split_by_procedures
-from src.parser import deps_mermaid, parse_plsql_deps
+from src.parsers import deps_mermaid, get_parser
 from src.publisher import MkdocsPublisher
 from src.scanner import CodeObject
+
+
+def parse_plsql_deps(content: str, self_name: str = ""):
+    return get_parser("PACKAGE_BODY").parse(content, self_name)
 
 PROMPTS = Path(__file__).parent.parent / "prompts"
 
@@ -122,6 +126,34 @@ def test_parse_plsql_deps():
     deps = parse_plsql_deps(src, self_name="billing")
     assert deps.tables == ["accounts", "invoices"]
     assert deps.calls == ["tax_pkg"]
+
+
+def test_python_parser_imports():
+    src = """
+import os
+import httpx
+from pathlib import Path
+from .runner import run_tick
+from . import models
+from src.state import StateStore
+
+def main():
+    pass
+"""
+    deps = get_parser("PYTHON_MODULE").parse(src, self_name="scheduler")
+    assert deps.calls == ["httpx", "models", "runner", "src"]
+    assert deps.tables == []
+
+
+def test_python_parser_broken_syntax_is_empty():
+    deps = get_parser("PYTHON_MODULE").parse("def broken(:\n", self_name="x")
+    assert deps.calls == [] and deps.tables == []
+
+
+def test_parser_registry():
+    assert get_parser("PACKAGE BODY") is not None   # oracle-типы
+    assert get_parser("PYTHON_MODULE") is not None
+    assert get_parser("DELPHI_UNIT") is None        # парсера Delphi нет — Deps()
 
 
 def test_mermaid_output():

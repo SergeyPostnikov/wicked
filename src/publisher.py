@@ -15,7 +15,7 @@ from pathlib import Path
 from git import Actor, InvalidGitRepositoryError, Repo
 from jinja2 import Environment, FileSystemLoader
 
-from src.parser import Deps, deps_mermaid
+from src.parsers import Deps, deps_mermaid
 from src.scanner import CodeObject
 
 log = logging.getLogger("autodocs.publisher")
