@@ -409,6 +409,28 @@ user_stories:
   successful_test_date: null
   verified_by: null
 
+- id: US-019
+  checked: null
+  type: extension
+  product_subsystem: Генерация / Python
+  role: Пользователь
+  key_function: Документирование Python-кода
+  how_to_test:
+    situation:
+    - В волюме с кодом есть .py-файлы.
+    start: запуск генерации
+    success:
+    - Сканер видит .py-файлы как объекты PYTHON_MODULE.
+    - Описания генерируются по python-семейству промптов (python_module.md,
+      python_chunk.md, python_summary.md).
+    - Большие модули режутся на чанки по границам def/class верхнего уровня.
+    - Страницы публикуются в docs/file/... наравне с PL/SQL и Delphi.
+    - Ограничение этапа — без диаграмм зависимостей (parser для Python нет).
+  notes: Выходит за рамки кейса заказчика (PL/SQL + Delphi) — расширяет
+    применимость инструмента. Зависимости через ast — отдельная история.
+  successful_test_date: null
+  verified_by: null
+
 - id: US-018
   checked: null
   type: extension

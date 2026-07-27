@@ -159,7 +159,9 @@ conventions:
   prompts:
     layout:
       - "prompts/templates/*.md.j2 — jinja2-скелеты страниц: секции, места фактов парсера, LLM-текста, диаграмм"
-      - "prompts/package.md, chunk.md, summary.md, delphi_unit.md — промпты по типам объектов"
+      - "prompts/package.md, chunk.md, summary.md — семейство PL/SQL"
+      - "prompts/delphi_unit.md, delphi_chunk.md, delphi_summary.md — семейство Delphi (с секцией «Работа с БД» — связь с PL/SQL)"
+      - "prompts/python_module.md, python_chunk.md, python_summary.md — семейство Python (US-019)"
     defaults: лежат в образе; при первом старте копируются в PROMPTS_PATH, если там пусто
     editing: потребитель правит файлы в волюме напрямую — без пересборки образа
     invalidation: >
