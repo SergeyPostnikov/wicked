@@ -49,6 +49,28 @@ def test_generator_single_call_when_fits():
     assert len(llm.calls) == 1
 
 
+def test_generator_picks_delphi_prompt():
+    llm = FakeLLM()
+    gen = Generator(llm, PROMPTS, context_tokens=8192)
+    obj = CodeObject(id="file:MainForm.pas", source="file", name="MainForm",
+                     type="DELPHI_UNIT", path="MainForm.pas", checksum="c" * 64,
+                     content="unit MainForm;\ninterface\nend.")
+    gen.describe(obj)
+    assert "Delphi" in llm.calls[0][0]  # системный промпт — из delphi_unit.md
+
+
+def test_generator_delphi_map_reduce_prompts():
+    llm = FakeLLM()
+    gen = Generator(llm, PROMPTS, context_tokens=100)
+    big = "".join(f"procedure TForm1.Handler{i}(Sender: TObject);\nbegin\nend;\n"
+                  for i in range(30))
+    obj = CodeObject(id="file:Big.pas", source="file", name="Big",
+                     type="DELPHI_UNIT", path="Big.pas", checksum="c" * 64,
+                     content=big)
+    gen.describe(obj)
+    assert all("Delphi" in system for system, _ in llm.calls)
+
+
 def test_generator_map_reduce_when_large():
     llm = FakeLLM()
     gen = Generator(llm, PROMPTS, context_tokens=100)  # крошечный контекст

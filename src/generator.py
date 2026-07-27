@@ -22,6 +22,14 @@ _PROC_RE = re.compile(r"^\s*(?:PROCEDURE|FUNCTION)\s+[A-Za-z_][\w$#]*",
 # Оценка: ~3 байта на токен для кода; половина контекста — под ответ модели
 _CHARS_PER_TOKEN = 3
 
+# Семейство промптов по типу объекта: (основной, чанк, сводка)
+_PLSQL_PROMPTS = ("package.md", "chunk.md", "summary.md")
+_DELPHI_PROMPTS = ("delphi_unit.md", "delphi_chunk.md", "delphi_summary.md")
+_PROMPTS_BY_TYPE = {
+    "DELPHI_UNIT": _DELPHI_PROMPTS,
+    "DELPHI_FORM": _DELPHI_PROMPTS,
+}  # всё остальное (PL/SQL из файлов и ALL_SOURCE) — _PLSQL_PROMPTS
+
 
 def split_by_procedures(content: str, max_chars: int) -> list[str]:
     """Режет исходник по границам процедур и пакует куски в чанки до max_chars.
@@ -62,17 +70,18 @@ class Generator:
 
     def describe(self, obj: CodeObject) -> str:
         """Текст описания объекта. Retryable-ошибки LLM уже отработаны клиентом."""
+        main_p, chunk_p, summary_p = _PROMPTS_BY_TYPE.get(obj.type, _PLSQL_PROMPTS)
         if len(obj.content) <= self._max_chars:
-            return self._llm.generate(self._prompt("package.md"), obj.content)
+            return self._llm.generate(self._prompt(main_p), obj.content)
 
         # map-reduce (US-005)
         chunks = split_by_procedures(obj.content, self._max_chars)
         log.info("Объект %s не влезает в контекст — %d чанков", obj.id, len(chunks))
-        chunk_prompt = self._prompt("chunk.md")
+        chunk_prompt = self._prompt(chunk_p)
         partials = [
             self._llm.generate(chunk_prompt,
                                f"[фрагмент {i + 1}/{len(chunks)}]\n{chunk}")
             for i, chunk in enumerate(chunks)
         ]
         joined = "\n\n---\n\n".join(partials)
-        return self._llm.generate(self._prompt("summary.md"), joined)
+        return self._llm.generate(self._prompt(summary_p), joined)
