@@ -26,7 +26,8 @@ RUN uv sync --frozen --no-dev --no-install-project
 
 # ── Приложение и дефолтные промпты ──
 COPY src/ ./src/
-COPY prompts/ ./default_prompts/   # копируются в PROMPTS_PATH при первом старте (US-017)
+# default_prompts копируются в PROMPTS_PATH при первом старте (US-017)
+COPY prompts/ ./default_prompts/
 RUN uv sync --frozen --no-dev
 ENV PATH="/app/.venv/bin:$PATH"
 

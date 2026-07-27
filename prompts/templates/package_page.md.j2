@@ -1,0 +1,23 @@
+# {{ object.name }}
+
+> Схема: `{{ object.schema }}` · Тип: {{ object.type }} · Строк: {{ object.lines }}
+> Сгенерировано: {{ generated_at }} · Модель: {{ model }} · Чексумма: `{{ object.checksum[:12] }}`
+
+<!-- autodocs:llm -->
+{{ llm_text }}
+<!-- /autodocs:llm -->
+
+## Зависимости (статический анализ)
+
+{% if diagram %}
+```mermaid
+{{ diagram }}
+```
+{% endif %}
+
+{% if object.tables %}
+**Таблицы:** {% for t in object.tables %}`{{ t }}`{% if not loop.last %}, {% endif %}{% endfor %}
+{% endif %}
+{% if object.calls %}
+**Вызывает:** {% for c in object.calls %}`{{ c }}`{% if not loop.last %}, {% endif %}{% endfor %}
+{% endif %}
