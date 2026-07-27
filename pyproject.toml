@@ -1,0 +1,31 @@
+[project]
+name = "autodocs"
+version = "0.1.0"
+description = "Self-hosted генерация документации по легаси-коду (PL/SQL Oracle 11, Delphi 7) локальной LLM на Ollama"
+requires-python = ">=3.12"
+license = {file = "LICENSE"}
+dependencies = [
+    "httpx>=0.27",             # клиент к Ollama (OpenAI-совместимый API)
+    "oracledb>=2.4",           # Oracle 11g — thick mode через Instant Client
+    "jinja2>=3.1",             # шаблоны страниц (US-017)
+    "apscheduler>=3.10",       # планировщик SCHEDULE_CRON (US-009)
+    "fastapi>=0.115",          # приёмник webhook (US-010)
+    "uvicorn>=0.30",
+    "gitpython>=3.1",          # git-операции с волюмом /wiki
+    "pydantic-settings>=2.4",  # конфигурация из env
+]
+# Рендер вики выполняет viewer-контейнер (squidfunk/mkdocs-material) —
+# mkdocs в зависимостях не нужен: publisher пишет docs/*.md и mkdocs.yml.
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]

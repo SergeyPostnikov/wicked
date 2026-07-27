@@ -1,0 +1,76 @@
+# Autodocs — референсный стек «из коробки».
+# Обязателен только сервис autodocs; ollama и viewer включаются профилями:
+#   docker compose up -d                          # только autodocs (Ollama уже захощена)
+#   docker compose --profile ollama up -d         # + локальная Ollama
+#   docker compose --profile viewer up -d         # + просмотр вики
+#   docker compose --profile ollama --profile viewer up -d   # всё сразу
+
+services:
+
+  autodocs:
+    build:
+      context: .
+      dockerfile: docker/autodocs.Dockerfile
+    container_name: autodocs
+    restart: unless-stopped
+    environment:
+      # ── LLM ──
+      OLLAMA_URL: ${OLLAMA_URL:-http://ollama:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5-coder:14b}
+      LLM_CONTEXT_TOKENS: ${LLM_CONTEXT_TOKENS:-8192}
+      LLM_TIMEOUT_SEC: ${LLM_TIMEOUT_SEC:-600}
+      # ── Источники ──
+      CODE_PATH: /code
+      ORACLE_DSN: ${ORACLE_DSN:-}          # host:port/service; пусто — источник отключён
+      ORACLE_USER: ${ORACLE_USER:-}
+      ORACLE_PASSWORD: ${ORACLE_PASSWORD:-}
+      ORACLE_SCHEMAS: ${ORACLE_SCHEMAS:-}
+      # ── Триггеры ──
+      SCHEDULE_CRON: ${SCHEDULE_CRON:-0 3 * * *}
+      GIT_POLL_SEC: ${GIT_POLL_SEC:-0}
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET:-}
+      # ── Публикация ──
+      WIKI_TYPE: ${WIKI_TYPE:-mkdocs}
+      WIKI_PATH: /wiki
+      PROMPTS_PATH: /prompts
+      # ── Система ──
+      MAX_RETRIES: ${MAX_RETRIES:-3}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      - ${CODE_DIR:-./code}:/code:ro       # исходники (EXCL-002: только чтение)
+      - ${WIKI_DIR:-./wiki}:/wiki          # git-репозиторий документации (docs/ + mkdocs.yml)
+      - ${PROMPTS_DIR:-./prompts}:/prompts # редактируемые промпты и шаблоны (US-017)
+      - autodocs-state:/state              # SQLite: чексуммы, статусы, история проходов
+    ports:
+      - "${WEBHOOK_PORT:-8080}:8080"       # приёмник webhook (US-010)
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: autodocs-ollama
+    profiles: [ollama]
+    restart: unless-stopped
+    volumes:
+      - ollama-models:/root/.ollama
+    # Для GPU раскомментировать:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+  viewer:
+    image: squidfunk/mkdocs-material:latest
+    container_name: autodocs-viewer
+    profiles: [viewer]
+    restart: unless-stopped
+    command: serve --dev-addr=0.0.0.0:8000
+    volumes:
+      - ${WIKI_DIR:-./wiki}:/docs:ro
+    ports:
+      - "${VIEWER_PORT:-8000}:8000"
+
+volumes:
+  autodocs-state:
+  ollama-models:
