@@ -80,7 +80,13 @@ def run_pipeline(trigger: str) -> None:
             publisher = MkdocsPublisher(settings.wiki_path,
                                         settings.prompts_path / "templates",
                                         settings.ollama_model)
+            publisher.prepare()
             for o in diff.changed:
+                if not o.content.strip():
+                    # пустой исходник (__init__.py и т.п.) — нечего документировать
+                    store.set_status(o.id, "SKIPPED")
+                    _last_run["skipped"] += 1
+                    continue
                 store.set_status(o.id, "RUNNING")
                 try:
                     deps = (parse_plsql_deps(o.content, o.name)

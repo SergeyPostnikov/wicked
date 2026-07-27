@@ -156,6 +156,18 @@ def test_publisher_writes_page_and_commits(tmp_path):
     assert "1 страниц" in repo.head.commit.message
 
 
+def test_publisher_prepare_makes_viewer_usable(tmp_path):
+    pub = MkdocsPublisher(tmp_path, PROMPTS / "templates", model="m")
+    pub.prepare()
+    assert (tmp_path / "mkdocs.yml").exists()
+    assert "Идёт первый проход" in (tmp_path / "docs" / "index.md").read_text()
+    # повторный prepare и finalize не трогают существующий mkdocs.yml
+    marker = "# custom\n"
+    (tmp_path / "mkdocs.yml").write_text(marker)
+    pub.prepare()
+    assert (tmp_path / "mkdocs.yml").read_text() == marker
+
+
 def test_publisher_idempotent_paths(tmp_path):
     pub = MkdocsPublisher(tmp_path, PROMPTS / "templates", model="m")
     oracle_obj = CodeObject(id="oracle:APP.BILLING:PACKAGE BODY", source="oracle",

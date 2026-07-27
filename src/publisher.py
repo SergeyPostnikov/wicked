@@ -44,6 +44,19 @@ class MkdocsPublisher:
                                 keep_trailing_newline=True)
         self._written: list[Path] = []
 
+    def prepare(self) -> None:
+        """Начало прохода: mkdocs.yml и черновой index.md, если их ещё нет —
+        viewer показывает вики уже во время первой генерации."""
+        self._docs.mkdir(parents=True, exist_ok=True)
+        mkdocs_yml = self._wiki / "mkdocs.yml"
+        if not mkdocs_yml.exists():
+            mkdocs_yml.write_text(_MKDOCS_YML, encoding="utf-8")
+        index = self._docs / "index.md"
+        if not index.exists():
+            index.write_text(
+                "# Документация\n\nИдёт первый проход генерации — страницы "
+                "появляются по мере готовности.\n", encoding="utf-8")
+
     def page_path(self, obj: CodeObject) -> Path:
         if obj.source == "oracle":
             owner, name = obj.path.split(".", 1)
@@ -101,9 +114,6 @@ class MkdocsPublisher:
         if not self._written:
             log.info("Страницы не менялись — публикация не требуется")
             return
-        mkdocs_yml = self._wiki / "mkdocs.yml"
-        if not mkdocs_yml.exists():
-            mkdocs_yml.write_text(_MKDOCS_YML, encoding="utf-8")
         self._write_index()
 
         try:
