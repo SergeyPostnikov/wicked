@@ -90,9 +90,17 @@ config:  # env-переменные / config.yml
     - {key: GIT_POLL_SEC,      required: false, default: 0, description: 0 — поллинг отключён}
     - {key: WEBHOOK_SECRET,    required: false, secret: true}
   publish:
-    - {key: WIKI_TYPE,         required: true,  values: [git-markdown],  # TBD: confluence, wikijs
-       description: Целевая вики — открытый вопрос, MVP = git-markdown}
-    - {key: WIKI_PATH,         required: false, default: /wiki}
+    - {key: WIKI_TYPE,         required: false, default: mkdocs,
+       description: >
+         Целевая вики. MVP — только mkdocs (markdown в git + MkDocs Material).
+         Publisher — адаптер за интерфейсом; wikijs/confluence — будущие адаптеры (US-018).}
+    - {key: WIKI_PATH,         required: false, default: /wiki,
+       description: Волюм с git-репозиторием документации (docs/ + mkdocs.yml)}
+  prompts:
+    - {key: PROMPTS_PATH,      required: false, default: /prompts,
+       description: >
+         Волюм с редактируемыми промптами и шаблонами страниц. При первом старте
+         туда копируются дефолты из образа; пользователь правит файлы напрямую (US-017).}
   system:
     - {key: MAX_RETRIES,       required: false, default: 3}
     - {key: LOG_LEVEL,         required: false, default: INFO}
@@ -115,6 +123,23 @@ platform_constraints:
 # ─── Соглашения ──────────────────────────────────────────────────────────────
 
 conventions:
+  wiki_structure:
+    principle: >
+      Иерархия и навигация вики — детерминированные, выводятся из структуры кода
+      (схема БД → пакет → объект; Delphi: проект → модуль). LLM на структуру
+      не влияет — страницы не «переезжают» между прогонами, ссылки стабильны.
+    mkdocs: publisher генерирует дерево docs/*.md и секцию nav в mkdocs.yml
+
+  prompts:
+    layout:
+      - "prompts/templates/*.md.j2 — jinja2-скелеты страниц: секции, места фактов парсера, LLM-текста, диаграмм"
+      - "prompts/package.md, chunk.md, summary.md, delphi_unit.md — промпты по типам объектов"
+    defaults: лежат в образе; при первом старте копируются в PROMPTS_PATH, если там пусто
+    editing: потребитель правит файлы в волюме напрямую — без пересборки образа
+    invalidation: >
+      Чексумма промпта/шаблона входит в ключ кэша страницы — правка промпта
+      регенерирует затронутые страницы на следующем прогоне.
+
   llm_usage:
     mode: deterministic_pipeline
     description: >
@@ -145,7 +170,7 @@ conventions:
 # ─── Открытые вопросы (из TZ.md) ─────────────────────────────────────────────
 
 open_questions:
-  - Целевая вики (Confluence / MediaWiki / Wiki.js / git-based) — MVP исходит из git-markdown
+  - Целевая вики (Confluence / MediaWiki / Wiki.js / git-based / *MkDocs Material) — MVP исходит из git-markdown
   - Git-хостинг и доступность webhooks — иначе поллинг или только расписание
   - Формат доступа к Oracle — прямой read-only или выгрузка DDL в репозиторий
   - Доступное железо → выбор модели и LLM_CONTEXT_TOKENS
