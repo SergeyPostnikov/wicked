@@ -11,7 +11,9 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # ── Oracle Instant Client (basiclite, x64) ──
-ARG INSTANTCLIENT_URL=https://download.oracle.com/otn_software/linux/instantclient/instantclient-basiclite-linuxx64.zip
+# Запинен на 19c: это последняя ветка клиента, поддерживающая сервер 11.2
+# (у заказчика Oracle 11; latest = 23ai с 11.2 не соединяется — ORA-28040).
+ARG INSTANTCLIENT_URL=https://download.oracle.com/otn_software/linux/instantclient/1928000/instantclient-basiclite-linux.x64-19.28.0.0.0dbru.zip
 RUN curl -sSL "$INSTANTCLIENT_URL" -o /tmp/ic.zip \
     && unzip -q /tmp/ic.zip -d /opt/oracle \
     && rm /tmp/ic.zip \
