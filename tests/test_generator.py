@@ -1,0 +1,114 @@
+from pathlib import Path
+
+from src.generator import Generator, split_by_procedures
+from src.parser import deps_mermaid, parse_plsql_deps
+from src.publisher import MkdocsPublisher
+from src.scanner import CodeObject
+
+PROMPTS = Path(__file__).parent.parent / "prompts"
+
+
+def make_obj(content: str, obj_id: str = "file:pkg/billing.pkb") -> CodeObject:
+    return CodeObject(id=obj_id, source="file", name="billing", type="PACKAGE_BODY",
+                      path="pkg/billing.pkb", checksum="c" * 64, content=content)
+
+
+class FakeLLM:
+    def __init__(self):
+        self.calls: list[tuple[str, str]] = []
+
+    def generate(self, system: str, user: str) -> str:
+        self.calls.append((system, user))
+        return f"описание #{len(self.calls)}"
+
+
+# ─── чанкование (US-005) ─────────────────────────────────────────────────────
+
+def test_split_respects_procedure_boundaries():
+    src = ("PACKAGE BODY billing AS\n"
+           + "".join(f"PROCEDURE p{i} IS BEGIN NULL; END;\n{'-- x' * 20}\n"
+                     for i in range(10))
+           + "END;")
+    chunks = split_by_procedures(src, max_chars=300)
+    assert len(chunks) > 1
+    assert "".join(chunks) == src  # ничего не потеряно
+    for chunk in chunks[1:]:  # каждый чанк (кроме шапки) начинается с процедуры
+        assert chunk.lstrip().upper().startswith("PROCEDURE")
+
+
+def test_split_small_source_is_single_chunk():
+    src = "PACKAGE BODY tiny AS END;"
+    assert split_by_procedures(src, max_chars=1000) == [src]
+
+
+def test_generator_single_call_when_fits():
+    llm = FakeLLM()
+    gen = Generator(llm, PROMPTS, context_tokens=8192)
+    text = gen.describe(make_obj("PACKAGE BODY small AS END;"))
+    assert text == "описание #1"
+    assert len(llm.calls) == 1
+
+
+def test_generator_map_reduce_when_large():
+    llm = FakeLLM()
+    gen = Generator(llm, PROMPTS, context_tokens=100)  # крошечный контекст
+    big = "".join(f"PROCEDURE p{i} IS BEGIN NULL; END;\n" for i in range(30))
+    gen.describe(make_obj(big))
+    assert len(llm.calls) > 2  # N чанков + 1 сводка
+    assert "фрагмент 1/" in llm.calls[0][1]
+
+
+# ─── parser (US-006) ─────────────────────────────────────────────────────────
+
+def test_parse_plsql_deps():
+    src = """
+    PROCEDURE calc IS
+    BEGIN
+      SELECT amount INTO v FROM invoices WHERE id = p_id;
+      UPDATE accounts SET balance = balance - v;
+      tax_pkg.apply(p_id);  -- вызов другого пакета
+      billing.internal(p_id);  -- self — исключается
+    END;
+    """
+    deps = parse_plsql_deps(src, self_name="billing")
+    assert deps.tables == ["accounts", "invoices"]
+    assert deps.calls == ["tax_pkg"]
+
+
+def test_mermaid_output():
+    deps = parse_plsql_deps("SELECT 1 FROM invoices; tax_pkg.apply(1);")
+    diagram = deps_mermaid("billing", deps)
+    assert diagram.startswith("flowchart LR")
+    assert "billing --> tax_pkg" in diagram
+    assert "billing --> invoices[(invoices)]" in diagram
+
+
+# ─── publisher (US-008) ──────────────────────────────────────────────────────
+
+def test_publisher_writes_page_and_commits(tmp_path):
+    pub = MkdocsPublisher(tmp_path, PROMPTS / "templates", model="test-model")
+    obj = make_obj("PACKAGE BODY billing AS END;")
+    deps = parse_plsql_deps("SELECT 1 FROM invoices;")
+
+    page = pub.publish(obj, "Пакет считает счета.", deps)
+    assert page == tmp_path / "docs" / "file" / "pkg" / "billing.pkb.md"
+    content = page.read_text()
+    assert "Пакет считает счета." in content
+    assert "<!-- autodocs:llm -->" in content
+    assert "`invoices`" in content
+
+    pub.finalize("test")
+    assert (tmp_path / "mkdocs.yml").exists()
+    from git import Repo
+    repo = Repo(tmp_path)
+    assert not repo.is_dirty(untracked_files=True)
+    assert "1 страниц" in repo.head.commit.message
+
+
+def test_publisher_idempotent_paths(tmp_path):
+    pub = MkdocsPublisher(tmp_path, PROMPTS / "templates", model="m")
+    oracle_obj = CodeObject(id="oracle:APP.BILLING:PACKAGE BODY", source="oracle",
+                            name="BILLING", type="PACKAGE BODY", path="APP.BILLING",
+                            checksum="c" * 64, content="x")
+    assert pub.page_path(oracle_obj) == \
+        tmp_path / "docs" / "oracle" / "APP" / "BILLING.PACKAGE_BODY.md"
