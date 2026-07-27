@@ -17,13 +17,14 @@ from src.config import Settings
 
 log = logging.getLogger("autodocs.scanner")
 
-# Расширение → тип объекта (US-002)
+# Расширение → тип объекта (US-002, US-019)
 EXTENSION_TYPES = {
     ".pks": "PACKAGE_SPEC",
     ".pkb": "PACKAGE_BODY",
     ".sql": "SQL",
     ".pas": "DELPHI_UNIT",
     ".dfm": "DELPHI_FORM",
+    ".py": "PYTHON_MODULE",
 }
 
 # Типы ALL_SOURCE, которые документируем (вьюхи — отдельно, их нет в ALL_SOURCE)

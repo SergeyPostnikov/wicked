@@ -71,6 +71,33 @@ def test_generator_delphi_map_reduce_prompts():
     assert all("Delphi" in system for system, _ in llm.calls)
 
 
+def test_generator_picks_python_prompt():
+    llm = FakeLLM()
+    gen = Generator(llm, PROMPTS, context_tokens=8192)
+    obj = CodeObject(id="file:app/utils.py", source="file", name="utils",
+                     type="PYTHON_MODULE", path="app/utils.py", checksum="c" * 64,
+                     content="def helper():\n    return 1\n")
+    gen.describe(obj)
+    assert "Python-модуль" in llm.calls[0][0]
+
+
+def test_generator_python_map_reduce_splits_by_def():
+    llm = FakeLLM()
+    gen = Generator(llm, PROMPTS, context_tokens=100)
+    big = "".join(f"def handler_{i}(x):\n    return x + {i}\n\n"
+                  f"class Thing{i}:\n    pass\n\n" for i in range(20))
+    obj = CodeObject(id="file:big.py", source="file", name="big",
+                     type="PYTHON_MODULE", path="big.py", checksum="c" * 64,
+                     content=big)
+    gen.describe(obj)
+    assert len(llm.calls) > 2  # порезалось на чанки + сводка
+    assert all("Python" in system for system, _ in llm.calls)
+    # чанки начинаются с границы def/class, а не с середины тела
+    for _, user in llm.calls[:-1]:
+        body = user.split("]\n", 1)[1]
+        assert body.startswith(("def ", "class ", "async def "))
+
+
 def test_generator_map_reduce_when_large():
     llm = FakeLLM()
     gen = Generator(llm, PROMPTS, context_tokens=100)  # крошечный контекст
