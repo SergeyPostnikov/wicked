@@ -13,6 +13,9 @@ services:
       dockerfile: docker/autodocs.Dockerfile
     container_name: autodocs
     restart: unless-stopped
+    # uid/gid владельца волюмов на хосте — чтобы файлы вики/промптов
+    # не оказались root-овыми (id -u / id -g)
+    user: "${UID:-1000}:${GID:-1000}"
     environment:
       # ── LLM ──
       OLLAMA_URL: ${OLLAMA_URL:-http://ollama:11434}

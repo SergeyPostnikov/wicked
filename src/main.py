@@ -23,6 +23,10 @@ from apscheduler.triggers.cron import CronTrigger
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
 
 from src.config import settings
+from src.generator import Generator
+from src.llm import LLMError, OllamaClient
+from src.parser import Deps, parse_plsql_deps
+from src.publisher import MkdocsPublisher
 from src.scanner import scan_all
 from src.state import StateStore
 
@@ -71,9 +75,32 @@ def run_pipeline(trigger: str) -> None:
             for o in diff.unchanged:
                 store.set_status(o.id, "SKIPPED")
 
-            # TODO: parser — сигнатуры и зависимости
-            # TODO: generator — LLM по промптам из PROMPTS_PATH, map-reduce для больших пакетов
-            # TODO: publisher — docs/*.md + mkdocs.yml в WIKI_PATH
+            generator = Generator(OllamaClient(settings), settings.prompts_path,
+                                  settings.llm_context_tokens)
+            publisher = MkdocsPublisher(settings.wiki_path,
+                                        settings.prompts_path / "templates",
+                                        settings.ollama_model)
+            for o in diff.changed:
+                store.set_status(o.id, "RUNNING")
+                try:
+                    deps = (parse_plsql_deps(o.content, o.name)
+                            if "PACKAGE" in o.type or o.type in ("SQL", "PROCEDURE",
+                                                                 "FUNCTION", "TRIGGER")
+                            else Deps())
+                    llm_text = generator.describe(o)
+                    publisher.publish(o, llm_text, deps)
+                    store.set_status(o.id, "SUCCESS")
+                    _last_run["processed"] += 1
+                except (LLMError, OSError) as e:
+                    # изоляция ошибок: объект в ERROR, проход продолжается (US-011)
+                    log.error("Объект %s: %s", o.id, e)
+                    store.set_status(o.id, "ERROR", str(e))
+                    _last_run["errors"] += 1
+            publisher.finalize(trigger)
+        except Exception:
+            # сбой этапа прохода — фиксируем и не роняем сервис (US-011)
+            log.exception("Проход аварийно завершён")
+            _last_run["errors"] += 1
         finally:
             store.close()
 
