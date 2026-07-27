@@ -136,6 +136,7 @@ def test_mermaid_output():
 
 def test_publisher_writes_page_and_commits(tmp_path):
     pub = MkdocsPublisher(tmp_path, PROMPTS / "templates", model="test-model")
+    pub.prepare()
     obj = make_obj("PACKAGE BODY billing AS END;")
     deps = parse_plsql_deps("SELECT 1 FROM invoices;")
 
