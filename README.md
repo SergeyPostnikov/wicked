@@ -33,8 +33,10 @@ flowchart LR
 - Ошибка одного объекта не прерывает проход — объект помечается ERROR,
   остальные документируются.
 
-## Быстрый старт
+## Быстрый старт — docker compose
 
+Рекомендуемый способ запуска — `docker compose`: весь стек описан в
+[docker-compose.yml](docker-compose.yml), поднимается одной командой.
 Нужны: Docker, Ollama с моделью (локально или по сети).
 
 ```bash
@@ -43,9 +45,26 @@ git clone git@github.com:SergeyPostnikov/wicked.git autodocs && cd autodocs
 # каталоги: код проекта (read-only), вики, промпты
 mkdir -p code wiki prompts
 
-UID=$(id -u) GID=$(id -g) docker compose up -d           # только autodocs
-# docker compose --profile ollama --profile viewer up -d # + Ollama и просмотр вики
+UID=$(id -u) GID=$(id -g) docker compose up -d
 ```
+
+Обязателен только сервис `autodocs`; остальные включаются compose-профилями:
+
+| Команда | Что поднимается |
+|---|---|
+| `docker compose up -d` | только autodocs (Ollama уже захощена у вас) |
+| `docker compose --profile ollama up -d` | + контейнер Ollama (волюм моделей, опц. GPU) |
+| `docker compose --profile viewer up -d` | + просмотр вики на :8000 (MkDocs Material) |
+| `docker compose --profile ollama --profile viewer up -d` | весь стек |
+
+Настройки — через `.env` рядом с `docker-compose.yml` (см. таблицу ниже);
+`UID`/`GID` задают владельца файлов вики на хосте. После правки `.env` —
+`docker compose up -d` перечитает конфигурацию.
+
+Альтернативы compose: одиночный `docker run` с волюмами `-v ./code:/code:ro
+-v ./wiki:/wiki -v ./prompts:/prompts` (когда Ollama внешняя и viewer не нужен)
+или запуск без Docker (`uv run python -m src.main`) — но образ предпочтительнее:
+в него запечён Oracle Instant Client 19c для доступа к Oracle 11.
 
 Запустить проход вручную:
 
